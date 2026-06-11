@@ -247,6 +247,23 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
   .err{color:var(--coral);font-size:14px;line-height:1.5;margin-top:14px;}
+
+  /* ---------- 축하 폭죽 ---------- */
+  #fireworks{
+    position:absolute;inset:0;z-index:70;pointer-events:none;display:none;
+  }
+  #fireworks.show{display:block;}
+  .celebrate-title{
+    font-size:40px;font-weight:800;letter-spacing:-0.02em;
+    background:linear-gradient(135deg,var(--gold),var(--coral),var(--jade));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    margin-bottom:6px;
+    animation:celebratePop .6s cubic-bezier(.2,1.5,.4,1) both;
+  }
+  @keyframes celebratePop{
+    0%{transform:scale(0) rotate(-8deg);opacity:0;}
+    100%{transform:scale(1) rotate(0);opacity:1;}
+  }
 </style>
 </head>
 <body>
@@ -335,6 +352,7 @@
   <!-- DONE -->
   <section id="done" class="screen">
     <div class="done-badge">🎉</div>
+    <div class="celebrate-title">잘했어요!</div>
     <h2>오늘 루틴 완료!</h2>
     <p class="lead">3개 부위를 모두 움직였어요.<br>내일도 같은 시간에 만나요.</p>
     <div class="score-grid" id="scoreGrid"></div>
@@ -350,6 +368,9 @@
     <div class="spinner"></div>
     <p id="loadText">AI 모델을 불러오는 중…</p>
   </div>
+
+  <!-- 축하 폭죽 -->
+  <canvas id="fireworks"></canvas>
 
 </div>
 
@@ -432,8 +453,8 @@ const EXERCISES = [
   },
   {
     id: "fist", module: "HAND", tag: "HAND",
-    title: "잼잼 (주먹 쥐기)", desc: "손을 펴고 주먹 쥐기 반복",
-    cue: "주먹 쥐었다 펴기 ✊", sub: "손바닥을 카메라에 보여주세요", goal: 10,
+    title: "잼잼 (주먹 쥐기)", desc: "양손 번갈아 주먹 쥐고 펴기",
+    cue: "주먹 쥐었다 펴기 ✊", sub: "왼손·오른손 각 10회", goal: 10,
     detector: "fist",
   },
 ];
@@ -455,6 +476,35 @@ let neckPitchSide = null; // 'U' | 'D' | null  넥 상하
 let oheeSide = null; // 'O' | 'E' | null  오-이 번갈아
 let winkSide = null; // 'L' | 'R' | null  마지막 윙크 쪽
 let winkPhase = "open"; // 'open'(두 눈 뜸) | 'winking'
+const fistCount = { L: 0, R: 0 };       // 손별 잼잼 횟수
+const fistPhase = { L: "ready", R: "ready" }; // 손별 상태머신
+
+// ---------- 사운드 (Web Audio) ----------
+let audioCtx = null;
+function initAudio() {
+  if (audioCtx) { if (audioCtx.state === "suspended") audioCtx.resume(); return; }
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+}
+function beep(freq = 660, dur = 0.09, type = "triangle", vol = 0.2) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type; osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.linearRampToValueAtTime(vol, t + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t + dur + 0.03);
+}
+// 세트 완료: 3음 상승 차임
+function chime() {
+  if (!audioCtx) return;
+  [[660, 0], [880, 110], [1175, 230]].forEach(([f, ms]) =>
+    setTimeout(() => beep(f, 0.16, "sine", 0.22), ms));
+}
+// 카운트음: 횟수가 올라갈수록 음정이 살짝 높아져 구분됨
+function countBeep(n) { beep(520 + Math.min(n, 12) * 26, 0.08, "triangle", 0.2); }
 
 // ---------- 화면 전환 ----------
 function show(name) {
@@ -492,7 +542,7 @@ async function loadModels() {
       delegate: "GPU",
     },
     runningMode: "VIDEO",
-    numHands: 1,
+    numHands: 2,
   });
 }
 
@@ -529,12 +579,6 @@ function bsMap(blendshapes) {
 //  ok = 얼굴/손이 화면에 잡혀있는지
 // ============================================================
 const detectors = {
-  // 입 벌리기: jawOpen 0..1
-  jawOpen(s) {
-    const v = s.face?.jawOpen ?? 0;
-    const open = v > 0.42, close = v < 0.15;
-    return { phaseOpen: open, phaseClose: close, progress: Math.min(v / 0.42, 1), ok: s.faceOk };
-  },
   // 미소: mouthSmileLeft+Right 평균
   smile(s) {
     const v = ((s.face?.mouthSmileLeft ?? 0) + (s.face?.mouthSmileRight ?? 0)) / 2;
@@ -548,15 +592,6 @@ const detectors = {
                (s.face?.browOuterUpRight ?? 0)) / 3;
     const open = v > 0.45, close = v < 0.15;
     return { phaseOpen: open, phaseClose: close, progress: Math.min(v / 0.45, 1), ok: s.faceOk };
-  },
-  // 주먹: 손가락끝-손목 평균거리 비율
-  fist(s) {
-    if (!s.handOk) return { ok: false, progress: 0 };
-    const v = s.handOpenness; // 0(주먹) .. 1(쫙)
-    const open = v > 0.65;   // 손 펼침
-    const close = v < 0.30;  // 주먹
-    return { phaseOpen: close, phaseClose: open, progress: 1 - v, ok: true };
-    // 주의: 잼잼은 "주먹 쥠"을 active(=phaseOpen)로 둠. 폄→쥠→폄 = 1회
   },
 };
 
@@ -606,11 +641,18 @@ function loop() {
 
   if (ex.module === "HAND") {
     const res = handLandmarker.detectForVideo(video, now);
+    signals.hands = [];
     if (res.landmarks && res.landmarks.length) {
-      const lm = res.landmarks[0];
       signals.handOk = true;
-      signals.handOpenness = handOpenness(lm);
-      drawHand(lm);
+      const hd = res.handedness || res.handednesses; // 버전별 필드명 대응
+      for (let i = 0; i < res.landmarks.length; i++) {
+        const lm = res.landmarks[i];
+        const cat = hd?.[i]?.[0]?.categoryName || "Right";
+        // MediaPipe는 입력이 미러링됐다고 가정하지만 우리는 원본 프레임을 넣으므로 좌우를 뒤집어 사용자 기준으로 맞춤
+        const side = cat === "Left" ? "R" : "L";
+        signals.hands.push({ openness: handOpenness(lm), side });
+        drawHand(lm);
+      }
     }
   } else {
     const res = faceLandmarker.detectForVideo(video, now);
@@ -633,12 +675,53 @@ function loop() {
     handleOhEe(oheeDetect(signals), ex);
   } else if (ex.detector === "wink") {
     handleWink(winkDetect(signals), ex);
+  } else if (ex.detector === "fist") {
+    handleFist(signals, ex);
   } else {
     handleRep(detectors[ex.detector](signals), ex);
   }
 }
 
-// 일반 반복 동작 (입/미소/눈썹/주먹): 중립→동작→중립 = 1회
+// 잼잼: 손별로 폄→쥠→폄 = 1회. 왼손·오른손 각 goal회씩.
+function handleFist(s, ex) {
+  setStatus(s.handOk);
+  if (!s.handOk || !s.hands.length) { updateRing(0); return; }
+
+  let progress = 0;
+  for (const h of s.hands) {
+    progress = Math.max(progress, 1 - h.openness); // 주먹에 가까울수록 링이 참
+    const side = h.side;
+    if (fistPhase[side] === "ready" && h.openness < 0.25) {
+      fistPhase[side] = "active";                 // 주먹 쥠
+    } else if (fistPhase[side] === "active" && h.openness > 0.7) {
+      fistPhase[side] = "ready";                  // 다시 폄 = 1회 완료
+      if (fistCount[side] < ex.goal) addFistRep(ex, side);
+    }
+  }
+  updateRing(progress);
+  cueSub.textContent = `왼손 ${fistCount.L}/${ex.goal} · 오른손 ${fistCount.R}/${ex.goal}`;
+}
+
+function addFistRep(ex, side) {
+  fistCount[side]++;
+  perExerciseReps[ex.id] = (perExerciseReps[ex.id] || 0) + 1;
+  const total = fistCount.L + fistCount.R;
+  totalPoints += 1;
+  pointsLive.textContent = totalPoints;
+  repNum.textContent = total;
+  countBeep(side === "L" ? fistCount.L : fistCount.R);
+  stage.classList.remove("pulse"); void stage.offsetWidth; stage.classList.add("pulse");
+
+  if (fistCount.L >= ex.goal && fistCount.R >= ex.goal) {
+    totalPoints += 20; // 세트 보너스
+    pointsLive.textContent = totalPoints;
+    showToast(`${ex.title} 완료! +20pt`);
+    chime();
+    setTimeout(() => nextExercise(), 900);
+  }
+}
+
+// 일반 반복 동작 (입/미소/눈썹): 중립→동작→중립 = 1회
 function handleRep(d, ex) {
   const ok = d.ok;
   setStatus(ok);
@@ -729,12 +812,14 @@ function addRep(ex) {
   totalPoints += 1;
   pointsLive.textContent = totalPoints;
   repNum.textContent = c;
+  countBeep(c);
   stage.classList.remove("pulse"); void stage.offsetWidth; stage.classList.add("pulse");
 
   if (c >= ex.goal) {
     totalPoints += 20; // 세트 보너스
     pointsLive.textContent = totalPoints;
     showToast(`${ex.title} 완료! +20pt`);
+    chime();
     setTimeout(() => nextExercise(), 900);
   }
 }
@@ -751,19 +836,17 @@ function setStatus(ok) {
 }
 
 // ---------- 랜드마크 계산 ----------
-// 손 펼침 정도: 손끝(8,12,16,20)~손목(0) 거리 / 손바닥기준 정규화
+// 손 펼침 정도: 펼쳐진 손가락 개수 기반 (0=주먹 .. 1=쫙).
+// 손 크기·거리에 무관하게 견고함. 손끝이 PIP보다 손목에서 멀면 그 손가락은 '펼침'.
 function handOpenness(lm) {
   const wrist = lm[0];
-  const mcp = lm[9]; // 중지 MCP - 손 크기 정규화 기준
-  const palm = Math.hypot(mcp.x - wrist.x, mcp.y - wrist.y) || 1e-3;
-  const tips = [8, 12, 16, 20];
-  let sum = 0;
-  for (const t of tips) {
-    sum += Math.hypot(lm[t].x - wrist.x, lm[t].y - wrist.y);
+  const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const fingers = [[8, 6], [12, 10], [16, 14], [20, 18]]; // [tip, pip] (검지~새끼)
+  let ext = 0;
+  for (const [tip, pip] of fingers) {
+    if (d(lm[tip], wrist) > d(lm[pip], wrist) * 1.05) ext++;
   }
-  const avg = sum / tips.length / palm; // 대략 주먹 ~1.4, 쫙편손 ~2.6
-  // 0..1 로 정규화
-  return Math.max(0, Math.min(1, (avg - 1.4) / (2.5 - 1.4)));
+  return ext / 4; // 0(주먹) .. 1(다 펼침)
 }
 
 // 고개 pitch 추정: 눈 중간~코 vs 코~턱 거리 비율 — 위(+) / 아래(-)
@@ -830,13 +913,19 @@ function renderStepTabs() {
 function loadExercise() {
   const ex = EXERCISES[exIndex];
   phase = "ready"; neckSide = null; neckPitchSide = null; oheeSide = null; winkSide = null; winkPhase = "open";
+  fistCount.L = 0; fistCount.R = 0; fistPhase.L = "ready"; fistPhase.R = "ready";
   exTitle.textContent = ex.title;
   exDesc.textContent = ex.desc;
   exTag.textContent = ex.tag;
   cueBig.textContent = ex.cue;
   cueSub.textContent = ex.sub;
-  repGoal.textContent = "/ " + ex.goal;
-  repNum.textContent = perExerciseReps[ex.id] || 0;
+  if (ex.detector === "fist") {
+    repGoal.textContent = "/ " + (ex.goal * 2); // 양손 합산
+    repNum.textContent = 0;
+  } else {
+    repGoal.textContent = "/ " + ex.goal;
+    repNum.textContent = perExerciseReps[ex.id] || 0;
+  }
   updateRing(0);
   renderStepTabs();
 }
@@ -844,6 +933,57 @@ function nextExercise() {
   exIndex++;
   if (exIndex >= EXERCISES.length) { finish(); return; }
   loadExercise();
+}
+
+// ---------- 축하 폭죽 ----------
+let fwRaf = null;
+function startFireworks(ms = 4500) {
+  const cv = $("fireworks");
+  const ctx = cv.getContext("2d");
+  cv.classList.add("show"); // 먼저 표시해야 실제 크기를 측정할 수 있음
+  const rect = cv.getBoundingClientRect();
+  const W = cv.width = rect.width || 360;
+  const H = cv.height = rect.height || 640;
+  if (fwRaf) cancelAnimationFrame(fwRaf);
+
+  const parts = [];
+  const colors = ["#2dd4bf", "#f5c451", "#fb7185", "#a78bfa", "#60a5fa", "#34d399"];
+  function burst(x, y) {
+    const n = 26 + Math.floor((x * 7 % 18));
+    const col = colors[Math.floor((y * 11) % colors.length)];
+    for (let i = 0; i < n; i++) {
+      const ang = (Math.PI * 2 * i) / n;
+      const sp = 1.4 + ((i * 37) % 100) / 28;
+      parts.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 1, col, size: 2 + (i % 3) });
+    }
+  }
+  let elapsed = 0, last = -1, nextBurst = 0;
+  // 초기 동시 폭죽
+  burst(W * 0.5, H * 0.28); burst(W * 0.28, H * 0.22); burst(W * 0.72, H * 0.25);
+
+  function frame(t) {
+    if (last < 0) last = t;
+    const dt = Math.min(50, t - last); last = t; elapsed += dt;
+    ctx.clearRect(0, 0, W, H);
+    nextBurst -= dt;
+    if (nextBurst <= 0 && elapsed < ms - 700) {
+      burst(W * (0.18 + (elapsed % 1000) / 1600), H * (0.15 + (elapsed % 700) / 1800));
+      nextBurst = 340 + (elapsed % 300);
+    }
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.vy += 0.045; p.vx *= 0.985; p.vy *= 0.985;
+      p.x += p.vx; p.y += p.vy; p.life -= dt / 1400;
+      if (p.life <= 0) { parts.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.col;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    if (elapsed < ms || parts.length) { fwRaf = requestAnimationFrame(frame); }
+    else { cv.classList.remove("show"); ctx.clearRect(0, 0, W, H); fwRaf = null; }
+  }
+  fwRaf = requestAnimationFrame(frame);
 }
 
 function finish() {
@@ -863,12 +1003,15 @@ function finish() {
   totalPoints += 50; // 올인원 보너스
   $("finalPoints").textContent = totalPoints + " pt";
   show("done");
+  startFireworks();
+  chime();
 }
 
 // ---------- 이벤트 ----------
 $("startBtn").addEventListener("click", async () => {
   const errEl = $("introErr");
   errEl.style.display = "none";
+  initAudio(); // 사용자 제스처 시점에 오디오 컨텍스트 활성화
   try {
     if (!faceLandmarker) await loadModels();
     $("loadText").textContent = "카메라를 켜는 중…";
@@ -896,7 +1039,7 @@ $("skipBtn").addEventListener("click", () => nextExercise());
 $("againBtn").addEventListener("click", () => show("intro"));
 
 // 디버그용 전역 노출
-window.__facefit = { EXERCISES, detectors, handOpenness, computeYaw };
+window.__facefit = { EXERCISES, detectors, handOpenness, computeYaw, computePitch, startFireworks };
 
 </script>
 </body>
