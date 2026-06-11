@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>페이스핏+ · 데일리 셀프케어</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+
+  :root{
+    --bg:#16142b;
+    --bg-2:#1f1c3d;
+    --card:#26224a;
+    --card-2:#2e2a55;
+    --ink:#f4f1ea;
+    --ink-dim:#a9a3c7;
+    --ink-faint:#6f6a93;
+    --jade:#2dd4bf;
+    --jade-deep:#0f766e;
+    --coral:#fb7185;
+    --gold:#f5c451;
+    --line:rgba(255,255,255,0.08);
+    --ring-track:rgba(255,255,255,0.10);
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:'Pretendard',system-ui,-apple-system,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    overflow:hidden;
+    position:fixed;
+    inset:0;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  #app{
+    height:100%;
+    max-width:480px;
+    margin:0 auto;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #2a2552 0%, transparent 55%),
+      var(--bg);
+  }
+
+  /* ---------- Screens ---------- */
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;}
+  .screen.active{display:flex;}
+
+  /* ---------- Intro ---------- */
+  #intro{padding:40px 28px;justify-content:center;gap:0;}
+  .brand-mark{
+    width:64px;height:64px;border-radius:20px;
+    background:linear-gradient(140deg,var(--jade),var(--jade-deep));
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 12px 40px -10px rgba(45,212,191,0.6);
+    margin-bottom:28px;
+  }
+  .brand-mark svg{width:34px;height:34px;}
+  .intro-eyebrow{
+    font-size:13px;letter-spacing:0.18em;text-transform:uppercase;
+    color:var(--jade);font-weight:600;margin-bottom:14px;
+  }
+  #intro h1{
+    font-size:34px;line-height:1.18;font-weight:800;letter-spacing:-0.02em;
+    margin-bottom:18px;
+  }
+  #intro h1 em{font-style:normal;color:var(--jade);}
+  #intro p{color:var(--ink-dim);font-size:15.5px;line-height:1.6;margin-bottom:36px;}
+  .module-preview{display:flex;flex-direction:column;gap:12px;margin-bottom:40px;}
+  .mp-row{
+    display:flex;align-items:center;gap:14px;
+    background:var(--card);border:1px solid var(--line);
+    border-radius:16px;padding:14px 16px;
+  }
+  .mp-icon{
+    width:42px;height:42px;border-radius:12px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:22px;
+    background:var(--card-2);
+  }
+  .mp-text strong{display:block;font-size:15px;font-weight:700;margin-bottom:2px;}
+  .mp-text span{font-size:13px;color:var(--ink-faint);}
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    border:none;border-radius:16px;font-family:inherit;cursor:pointer;
+    font-weight:700;font-size:16.5px;padding:17px;width:100%;
+    transition:transform .12s ease, opacity .2s ease;
+  }
+  .btn:active{transform:scale(0.975);}
+  .btn-primary{
+    background:linear-gradient(135deg,var(--jade),#1ba89a);
+    color:#06281f;box-shadow:0 10px 30px -8px rgba(45,212,191,0.55);
+  }
+  .btn-ghost{background:var(--card);color:var(--ink);border:1px solid var(--line);}
+
+  /* ---------- Workout header ---------- */
+  #workout{padding:0;}
+  .wk-top{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 18px 12px;
+  }
+  .wk-back{
+    width:40px;height:40px;border-radius:12px;border:1px solid var(--line);
+    background:var(--card);color:var(--ink);font-size:20px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .wk-points{
+    display:flex;align-items:center;gap:7px;
+    background:var(--card);border:1px solid var(--line);
+    padding:8px 14px;border-radius:999px;font-weight:700;font-size:15px;
+  }
+  .wk-points b{color:var(--gold);}
+
+  .step-tabs{display:flex;gap:8px;padding:0 18px 14px;}
+  .step-dot{
+    flex:1;height:4px;border-radius:3px;background:var(--ring-track);
+    transition:background .3s;
+  }
+  .step-dot.done{background:var(--jade);}
+  .step-dot.current{background:var(--coral);}
+
+  /* ---------- Camera stage ---------- */
+  .stage{
+    position:relative;margin:0 18px;border-radius:24px;overflow:hidden;
+    background:#0c0b1a;flex:1 1 auto;min-height:0;
+    border:1px solid var(--line);
+  }
+  .stage video,.stage canvas{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    transform:scaleX(-1);
+  }
+  .stage canvas{z-index:2;}
+  .stage video{z-index:1;}
+
+  .ring-wrap{
+    position:absolute;z-index:3;top:14px;left:50%;transform:translateX(-50%);
+    width:96px;height:96px;
+  }
+  .ring-wrap svg{transform:rotate(-90deg);}
+  .ring-track{stroke:var(--ring-track);}
+  .ring-fill{stroke:var(--jade);stroke-linecap:round;transition:stroke-dashoffset .25s ease;}
+  .ring-count{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+  }
+  .ring-count .num{font-size:30px;font-weight:800;line-height:1;}
+  .ring-count .goal{font-size:12px;color:var(--ink-dim);margin-top:2px;}
+
+  .stage.pulse{animation:pulse .4s ease;}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(45,212,191,0.5);}
+    100%{box-shadow:0 0 0 18px rgba(45,212,191,0);}
+  }
+
+  .cue{
+    position:absolute;z-index:3;bottom:0;left:0;right:0;
+    padding:30px 18px 18px;
+    background:linear-gradient(0deg,rgba(12,11,26,0.92),transparent);
+    text-align:center;
+  }
+  .cue .big{font-size:26px;font-weight:800;letter-spacing:-0.01em;}
+  .cue .sub{font-size:13.5px;color:var(--ink-dim);margin-top:5px;}
+
+  .status-pill{
+    position:absolute;z-index:3;top:16px;right:16px;
+    display:flex;align-items:center;gap:6px;
+    font-size:12px;font-weight:600;padding:6px 11px;border-radius:999px;
+    background:rgba(12,11,26,0.7);backdrop-filter:blur(8px);color:var(--ink-dim);
+  }
+  .status-pill .led{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);}
+  .status-pill.on .led{background:var(--jade);box-shadow:0 0 8px var(--jade);}
+  .status-pill.on{color:var(--jade);}
+
+  /* gentle hint when no face/hand */
+  .stage-hint{
+    position:absolute;z-index:3;inset:0;display:flex;align-items:center;justify-content:center;
+    text-align:center;padding:30px;color:var(--ink-dim);font-size:14px;line-height:1.5;
+    background:rgba(12,11,26,0.55);backdrop-filter:blur(2px);
+  }
+  .stage-hint.hidden{display:none;}
+
+  /* ---------- Bottom action ---------- */
+  .wk-bottom{padding:16px 18px calc(16px + env(safe-area-inset-bottom));flex-shrink:0;}
+  .wk-meta{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:14px;
+  }
+  .wk-meta .title{font-size:18px;font-weight:800;}
+  .wk-meta .desc{font-size:13px;color:var(--ink-faint);margin-top:2px;}
+  .wk-meta .module-tag{
+    font-size:11px;font-weight:700;letter-spacing:0.05em;
+    color:var(--jade);background:rgba(45,212,191,0.12);
+    padding:5px 10px;border-radius:8px;
+  }
+
+  /* ---------- Loading ---------- */
+  #loading{position:absolute;inset:0;z-index:50;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;background:var(--bg);}
+  #loading.active{display:flex;}
+  .spinner{
+    width:44px;height:44px;border-radius:50%;
+    border:3px solid var(--ring-track);border-top-color:var(--jade);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #loading p{color:var(--ink-dim);font-size:14px;}
+
+  /* ---------- Done screen ---------- */
+  #done{padding:40px 28px;justify-content:center;align-items:center;text-align:center;}
+  .done-badge{
+    width:110px;height:110px;border-radius:50%;
+    background:radial-gradient(circle at 50% 35%,var(--jade),var(--jade-deep));
+    display:flex;align-items:center;justify-content:center;font-size:54px;
+    box-shadow:0 16px 50px -12px rgba(45,212,191,0.6);margin-bottom:28px;
+    animation:pop .5s cubic-bezier(.2,1.4,.4,1);
+  }
+  @keyframes pop{0%{transform:scale(0);}100%{transform:scale(1);}}
+  #done h2{font-size:28px;font-weight:800;margin-bottom:10px;}
+  #done .lead{color:var(--ink-dim);font-size:15px;margin-bottom:30px;line-height:1.5;}
+  .score-grid{display:flex;gap:10px;width:100%;margin-bottom:14px;}
+  .score-cell{
+    flex:1;background:var(--card);border:1px solid var(--line);
+    border-radius:16px;padding:18px 10px;
+  }
+  .score-cell .v{font-size:26px;font-weight:800;color:var(--jade);}
+  .score-cell .l{font-size:12px;color:var(--ink-faint);margin-top:4px;}
+  .total-points{
+    width:100%;background:linear-gradient(135deg,rgba(245,196,81,0.15),rgba(245,196,81,0.05));
+    border:1px solid rgba(245,196,81,0.25);border-radius:18px;
+    padding:18px;margin-bottom:30px;display:flex;align-items:center;justify-content:space-between;
+  }
+  .total-points .lab{font-size:14px;color:var(--ink-dim);}
+  .total-points .pts{font-size:24px;font-weight:800;color:var(--gold);}
+
+  .toast{
+    position:absolute;z-index:40;top:74px;left:50%;transform:translateX(-50%) translateY(-20px);
+    background:var(--jade);color:#06281f;font-weight:700;font-size:14px;
+    padding:10px 20px;border-radius:999px;opacity:0;transition:all .3s;
+    white-space:nowrap;box-shadow:0 8px 24px -6px rgba(45,212,191,0.6);
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .err{color:var(--coral);font-size:14px;line-height:1.5;margin-top:14px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- INTRO -->
+  <section id="intro" class="screen active">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#06281f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v2M12 19v2M3 12h2M19 12h2"/>
+        <circle cx="12" cy="12" r="5"/>
+        <circle cx="12" cy="12" r="1.5" fill="#06281f"/>
+      </svg>
+    </div>
+    <div class="intro-eyebrow">데일리 셀프케어</div>
+    <h1>오늘의 <em>5분</em>,<br>카메라가 함께합니다</h1>
+    <p>얼굴·목어깨·손 운동을 휴대폰 카메라가 실시간으로 측정하고 인증해요. 제대로 한 만큼 포인트가 쌓입니다.</p>
+
+    <div class="module-preview">
+      <div class="mp-row">
+        <div class="mp-icon">😀</div>
+        <div class="mp-text"><strong>페이스 핏</strong><span>입·눈썹·미소 표정 운동</span></div>
+      </div>
+      <div class="mp-row">
+        <div class="mp-icon">🙆</div>
+        <div class="mp-text"><strong>넥 핏</strong><span>고개 좌우 스트레칭</span></div>
+      </div>
+      <div class="mp-row">
+        <div class="mp-icon">✊</div>
+        <div class="mp-text"><strong>핸드 핏 (잼잼)</strong><span>주먹 쥐었다 펴기</span></div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="startBtn">시작하기</button>
+    <p class="err" id="introErr" style="display:none;text-align:center;"></p>
+  </section>
+
+  <!-- WORKOUT -->
+  <section id="workout" class="screen">
+    <div class="wk-top">
+      <button class="wk-back" id="backBtn">‹</button>
+      <div class="wk-points">✦ <b id="pointsLive">0</b> pt</div>
+    </div>
+    <div class="step-tabs" id="stepTabs"></div>
+
+    <div class="stage" id="stage">
+      <video id="video" playsinline autoplay muted></video>
+      <canvas id="overlay"></canvas>
+
+      <div class="status-pill" id="statusPill"><span class="led"></span><span id="statusText">감지 대기</span></div>
+
+      <div class="ring-wrap">
+        <svg width="96" height="96" viewBox="0 0 96 96">
+          <circle class="ring-track" cx="48" cy="48" r="42" fill="none" stroke-width="7"/>
+          <circle class="ring-fill" id="ringFill" cx="48" cy="48" r="42" fill="none" stroke-width="7"
+                  stroke-dasharray="263.9" stroke-dashoffset="263.9"/>
+        </svg>
+        <div class="ring-count">
+          <div class="num" id="repNum">0</div>
+          <div class="goal" id="repGoal">/ 10</div>
+        </div>
+      </div>
+
+      <div class="stage-hint" id="stageHint">카메라를 정면으로<br>바라봐 주세요</div>
+
+      <div class="cue">
+        <div class="big" id="cueBig">준비</div>
+        <div class="sub" id="cueSub">화면 안에 들어와 주세요</div>
+      </div>
+    </div>
+
+    <div class="wk-bottom">
+      <div class="wk-meta">
+        <div>
+          <div class="title" id="exTitle">페이스 핏</div>
+          <div class="desc" id="exDesc">입을 크게 벌렸다 닫기</div>
+        </div>
+        <div class="module-tag" id="exTag">FACE</div>
+      </div>
+      <button class="btn btn-ghost" id="skipBtn">이 동작 건너뛰기</button>
+    </div>
+
+    <div class="toast" id="toast"></div>
+  </section>
+
+  <!-- DONE -->
+  <section id="done" class="screen">
+    <div class="done-badge">🎉</div>
+    <h2>오늘 루틴 완료!</h2>
+    <p class="lead">3개 부위를 모두 움직였어요.<br>내일도 같은 시간에 만나요.</p>
+    <div class="score-grid" id="scoreGrid"></div>
+    <div class="total-points">
+      <span class="lab">오늘 적립 포인트</span>
+      <span class="pts" id="finalPoints">0 pt</span>
+    </div>
+    <button class="btn btn-primary" id="againBtn">처음으로</button>
+  </section>
+
+  <!-- LOADING -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <p id="loadText">AI 모델을 불러오는 중…</p>
+  </div>
+
+</div>
+
+<script type="module">
+// ============================================================
+// 페이스핏+  ·  MediaPipe Tasks Vision 기반 동작 인증 엔진
+// ============================================================
+import {
+  FilesetResolver,
+  FaceLandmarker,
+  HandLandmarker,
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/vision_bundle.mjs";
+
+// ---------- DOM ----------
+const $ = (id) => document.getElementById(id);
+const screens = {
+  intro: $("intro"), workout: $("workout"), done: $("done"),
+};
+const loading = $("loading");
+const video = $("video");
+const overlay = $("overlay");
+const octx = overlay.getContext("2d");
+
+const ringFill = $("ringFill");
+const repNum = $("repNum");
+const repGoal = $("repGoal");
+const cueBig = $("cueBig");
+const cueSub = $("cueSub");
+const exTitle = $("exTitle");
+const exDesc = $("exDesc");
+const exTag = $("exTag");
+const statusPill = $("statusPill");
+const statusText = $("statusText");
+const stageHint = $("stageHint");
+const stage = $("stage");
+const stepTabs = $("stepTabs");
+const pointsLive = $("pointsLive");
+const toast = $("toast");
+
+const RING_CIRC = 2 * Math.PI * 42; // 263.9
+
+// ---------- 운동 정의 ----------
+// type: 어떤 신호를 보는지. goal: 목표 반복수.
+const EXERCISES = [
+  {
+    id: "mouth", module: "FACE", tag: "FACE",
+    title: "입 크게 벌리기", desc: "아~ 입을 크게 벌렸다 닫기",
+    cue: "입을 크게 '아'", sub: "크게 벌렸다가 다물어요", goal: 8,
+    detector: "jawOpen",
+  },
+  {
+    id: "smile", module: "FACE", tag: "FACE",
+    title: "활짝 미소", desc: "입꼬리를 올려 미소 짓기",
+    cue: "활짝 웃기 😄", sub: "입꼬리를 끝까지 올려요", goal: 6,
+    detector: "smile",
+  },
+  {
+    id: "brow", module: "FACE", tag: "FACE",
+    title: "눈썹 올리기", desc: "눈썹을 위로 치켜올리기",
+    cue: "눈썹 위로 ⬆️", sub: "이마에 주름이 잡히도록", goal: 6,
+    detector: "brow",
+  },
+  {
+    id: "neck", module: "NECK", tag: "NECK",
+    title: "고개 좌우 돌리기", desc: "고개를 천천히 좌우로",
+    cue: "고개 좌우로", sub: "왼쪽 끝 → 오른쪽 끝 = 1회", goal: 6,
+    detector: "neckYaw",
+  },
+  {
+    id: "fist", module: "HAND", tag: "HAND",
+    title: "잼잼 (주먹 쥐기)", desc: "손을 펴고 주먹 쥐기 반복",
+    cue: "주먹 쥐었다 펴기 ✊", sub: "손바닥을 카메라에 보여주세요", goal: 10,
+    detector: "fist",
+  },
+];
+
+// ---------- 상태 ----------
+let faceLandmarker = null;
+let handLandmarker = null;
+let stream = null;
+let rafId = null;
+let exIndex = 0;
+let totalPoints = 0;
+const perExerciseReps = {}; // id -> count
+
+// 동작별 상태머신: phase 'ready'(중립) <-> 'active'(동작중)
+let phase = "ready";
+let lastVideoTime = -1;
+let neckSide = null; // 'L' | 'R' | null  넥은 좌우 왕복
+
+// ---------- 화면 전환 ----------
+function show(name) {
+  Object.values(screens).forEach((s) => s.classList.remove("active"));
+  screens[name].classList.add("active");
+}
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 1400);
+}
+
+// ---------- 모델 로딩 ----------
+async function loadModels() {
+  loading.classList.add("active");
+  $("loadText").textContent = "AI 모델을 불러오는 중…";
+  const fileset = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm"
+  );
+  faceLandmarker = await FaceLandmarker.createFromOptions(fileset, {
+    baseOptions: {
+      modelAssetPath:
+        "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+      delegate: "GPU",
+    },
+    runningMode: "VIDEO",
+    numFaces: 1,
+    outputFaceBlendshapes: true,
+    outputFacialTransformationMatrixes: false,
+  });
+  handLandmarker = await HandLandmarker.createFromOptions(fileset, {
+    baseOptions: {
+      modelAssetPath:
+        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+      delegate: "GPU",
+    },
+    runningMode: "VIDEO",
+    numHands: 1,
+  });
+}
+
+// ---------- 카메라 ----------
+async function startCamera() {
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 960 } },
+    audio: false,
+  });
+  video.srcObject = stream;
+  await new Promise((res) => {
+    video.onloadedmetadata = () => { video.play(); res(); };
+  });
+  overlay.width = video.videoWidth;
+  overlay.height = video.videoHeight;
+}
+function stopCamera() {
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  if (rafId) cancelAnimationFrame(rafId);
+  stream = null; rafId = null;
+}
+
+// ---------- blendshape helper ----------
+function bsMap(blendshapes) {
+  const m = {};
+  if (blendshapes && blendshapes[0]) {
+    for (const c of blendshapes[0].categories) m[c.categoryName] = c.score;
+  }
+  return m;
+}
+
+// ============================================================
+//  검출기들 — 공통 인터페이스: (signals) => {triggered:bool, progress:0..1, ok:bool}
+//  ok = 얼굴/손이 화면에 잡혀있는지
+// ============================================================
+const detectors = {
+  // 입 벌리기: jawOpen 0..1
+  jawOpen(s) {
+    const v = s.face?.jawOpen ?? 0;
+    const open = v > 0.42, close = v < 0.15;
+    return { phaseOpen: open, phaseClose: close, progress: Math.min(v / 0.42, 1), ok: s.faceOk };
+  },
+  // 미소: mouthSmileLeft+Right 평균
+  smile(s) {
+    const v = ((s.face?.mouthSmileLeft ?? 0) + (s.face?.mouthSmileRight ?? 0)) / 2;
+    const open = v > 0.5, close = v < 0.18;
+    return { phaseOpen: open, phaseClose: close, progress: Math.min(v / 0.5, 1), ok: s.faceOk };
+  },
+  // 눈썹 올리기: browInnerUp + outer 평균
+  brow(s) {
+    const v = ((s.face?.browInnerUp ?? 0) +
+               (s.face?.browOuterUpLeft ?? 0) +
+               (s.face?.browOuterUpRight ?? 0)) / 3;
+    const open = v > 0.45, close = v < 0.15;
+    return { phaseOpen: open, phaseClose: close, progress: Math.min(v / 0.45, 1), ok: s.faceOk };
+  },
+  // 주먹: 손가락끝-손목 평균거리 비율
+  fist(s) {
+    if (!s.handOk) return { ok: false, progress: 0 };
+    const v = s.handOpenness; // 0(주먹) .. 1(쫙)
+    const open = v > 0.65;   // 손 펼침
+    const close = v < 0.30;  // 주먹
+    return { phaseOpen: close, phaseClose: open, progress: 1 - v, ok: true };
+    // 주의: 잼잼은 "주먹 쥠"을 active(=phaseOpen)로 둠. 폄→쥠→폄 = 1회
+  },
+};
+
+// 넥은 좌우 왕복이라 별도 처리
+function neckDetect(s) {
+  if (!s.faceOk) return { ok: false };
+  const yaw = s.neckYaw; // -1(왼쪽 끝) .. +1(오른쪽 끝)  (미러 보정 후 사용자 기준)
+  return { ok: true, yaw };
+}
+
+// ============================================================
+//  메인 루프
+// ============================================================
+function loop() {
+  rafId = requestAnimationFrame(loop);
+  if (video.readyState < 2) return;
+  const now = performance.now();
+  if (video.currentTime === lastVideoTime) return;
+  lastVideoTime = video.currentTime;
+
+  const ex = EXERCISES[exIndex];
+  const signals = { faceOk: false, handOk: false, face: null };
+
+  // ----- 필요한 모델만 추론 -----
+  octx.clearRect(0, 0, overlay.width, overlay.height);
+
+  if (ex.module === "HAND") {
+    const res = handLandmarker.detectForVideo(video, now);
+    if (res.landmarks && res.landmarks.length) {
+      const lm = res.landmarks[0];
+      signals.handOk = true;
+      signals.handOpenness = handOpenness(lm);
+      drawHand(lm);
+    }
+  } else {
+    const res = faceLandmarker.detectForVideo(video, now);
+    if (res.faceLandmarks && res.faceLandmarks.length) {
+      signals.faceOk = true;
+      signals.face = bsMap(res.faceBlendshapes);
+      const lm = res.faceLandmarks[0];
+      signals.neckYaw = computeYaw(lm);
+      drawFaceMini(lm);
+    }
+  }
+
+  // ----- 상태/판정 -----
+  if (ex.detector === "neckYaw") {
+    handleNeck(neckDetect(signals), ex);
+  } else {
+    handleRep(detectors[ex.detector](signals), ex);
+  }
+}
+
+// 일반 반복 동작 (입/미소/눈썹/주먹): 중립→동작→중립 = 1회
+function handleRep(d, ex) {
+  const ok = d.ok;
+  setStatus(ok);
+  if (!ok) { updateRing(0); return; }
+  updateRing(d.progress ?? 0);
+
+  if (phase === "ready" && d.phaseOpen) {
+    phase = "active";
+  } else if (phase === "active" && d.phaseClose) {
+    phase = "ready";
+    addRep(ex);
+  }
+}
+
+// 넥 좌우 왕복: 왼쪽끝 도달 후 오른쪽끝 도달 = 1회
+function handleNeck(d, ex) {
+  const ok = d.ok;
+  setStatus(ok);
+  if (!ok) { updateRing(0); return; }
+  const yaw = d.yaw;
+  updateRing(Math.min(Math.abs(yaw) / 0.6, 1));
+  const TH = 0.45;
+  if (yaw < -TH) {
+    if (neckSide === "R" || neckSide === null) { neckSide = "L"; }
+  } else if (yaw > TH) {
+    if (neckSide === "L") { neckSide = "R"; addRep(ex); }
+    else if (neckSide === null) { neckSide = "R"; }
+  }
+}
+
+function addRep(ex) {
+  perExerciseReps[ex.id] = (perExerciseReps[ex.id] || 0) + 1;
+  const c = perExerciseReps[ex.id];
+  totalPoints += 1;
+  pointsLive.textContent = totalPoints;
+  repNum.textContent = c;
+  stage.classList.remove("pulse"); void stage.offsetWidth; stage.classList.add("pulse");
+
+  if (c >= ex.goal) {
+    totalPoints += 20; // 세트 보너스
+    pointsLive.textContent = totalPoints;
+    showToast(`${ex.title} 완료! +20pt`);
+    setTimeout(() => nextExercise(), 900);
+  }
+}
+
+// ---------- 시각 갱신 ----------
+function updateRing(p) {
+  const off = RING_CIRC * (1 - Math.max(0, Math.min(1, p)));
+  ringFill.style.strokeDashoffset = off;
+}
+function setStatus(ok) {
+  statusPill.classList.toggle("on", ok);
+  statusText.textContent = ok ? "감지 중" : "감지 대기";
+  stageHint.classList.toggle("hidden", ok);
+}
+
+// ---------- 랜드마크 계산 ----------
+// 손 펼침 정도: 손끝(8,12,16,20)~손목(0) 거리 / 손바닥기준 정규화
+function handOpenness(lm) {
+  const wrist = lm[0];
+  const mcp = lm[9]; // 중지 MCP - 손 크기 정규화 기준
+  const palm = Math.hypot(mcp.x - wrist.x, mcp.y - wrist.y) || 1e-3;
+  const tips = [8, 12, 16, 20];
+  let sum = 0;
+  for (const t of tips) {
+    sum += Math.hypot(lm[t].x - wrist.x, lm[t].y - wrist.y);
+  }
+  const avg = sum / tips.length / palm; // 대략 주먹 ~1.4, 쫙편손 ~2.6
+  // 0..1 로 정규화
+  return Math.max(0, Math.min(1, (avg - 1.4) / (2.5 - 1.4)));
+}
+
+// 고개 yaw 추정: 코끝(1)이 양 볼(234 왼, 454 오) 사이 어디인가
+// 반환: -1(사용자 왼쪽) .. +1(사용자 오른쪽). 미러링은 화면용일 뿐 좌표는 원본 기준.
+function computeYaw(lm) {
+  const nose = lm[1];
+  const cheekL = lm[234]; // 이미지상 왼쪽 = 사용자 오른쪽
+  const cheekR = lm[454]; // 이미지상 오른쪽 = 사용자 왼쪽
+  const mid = (cheekL.x + cheekR.x) / 2;
+  const halfW = Math.abs(cheekR.x - cheekL.x) / 2 || 1e-3;
+  let v = (nose.x - mid) / halfW; // -1..+1 (이미지 좌표)
+  // 사용자 기준으로 부호 통일: 이미지 왼쪽(작은x)=사용자 오른쪽
+  return Math.max(-1, Math.min(1, v));
+}
+
+// ---------- 가벼운 오버레이 (점 몇 개만) ----------
+function drawFaceMini(lm) {
+  octx.fillStyle = "rgba(45,212,191,0.85)";
+  const pts = [1, 234, 454, 10, 152]; // 코, 양볼, 이마, 턱
+  for (const i of pts) {
+    octx.beginPath();
+    octx.arc(lm[i].x * overlay.width, lm[i].y * overlay.height, 3, 0, 7);
+    octx.fill();
+  }
+}
+function drawHand(lm) {
+  octx.strokeStyle = "rgba(45,212,191,0.7)";
+  octx.lineWidth = 2;
+  const bones = [[0,5],[5,8],[0,9],[9,12],[0,13],[13,16],[0,17],[17,20],[0,1],[1,4]];
+  for (const [a,b] of bones) {
+    octx.beginPath();
+    octx.moveTo(lm[a].x*overlay.width, lm[a].y*overlay.height);
+    octx.lineTo(lm[b].x*overlay.width, lm[b].y*overlay.height);
+    octx.stroke();
+  }
+  octx.fillStyle = "rgba(251,113,133,0.9)";
+  for (const t of [4,8,12,16,20]) {
+    octx.beginPath();
+    octx.arc(lm[t].x*overlay.width, lm[t].y*overlay.height, 4, 0, 7);
+    octx.fill();
+  }
+}
+
+// ---------- 운동 진행 ----------
+function renderStepTabs() {
+  stepTabs.innerHTML = "";
+  EXERCISES.forEach((_, i) => {
+    const d = document.createElement("div");
+    d.className = "step-dot" + (i < exIndex ? " done" : i === exIndex ? " current" : "");
+    stepTabs.appendChild(d);
+  });
+}
+function loadExercise() {
+  const ex = EXERCISES[exIndex];
+  phase = "ready"; neckSide = null;
+  exTitle.textContent = ex.title;
+  exDesc.textContent = ex.desc;
+  exTag.textContent = ex.tag;
+  cueBig.textContent = ex.cue;
+  cueSub.textContent = ex.sub;
+  repGoal.textContent = "/ " + ex.goal;
+  repNum.textContent = perExerciseReps[ex.id] || 0;
+  updateRing(0);
+  renderStepTabs();
+}
+function nextExercise() {
+  exIndex++;
+  if (exIndex >= EXERCISES.length) { finish(); return; }
+  loadExercise();
+}
+
+function finish() {
+  stopCamera();
+  // 점수 요약
+  const grid = $("scoreGrid");
+  const byModule = { FACE:0, NECK:0, HAND:0 };
+  EXERCISES.forEach((e) => { byModule[e.tag] += (perExerciseReps[e.id]||0); });
+  grid.innerHTML = "";
+  const labels = { FACE:"얼굴", NECK:"목·어깨", HAND:"손" };
+  for (const k of ["FACE","NECK","HAND"]) {
+    const cell = document.createElement("div");
+    cell.className = "score-cell";
+    cell.innerHTML = `<div class="v">${byModule[k]}</div><div class="l">${labels[k]} 동작</div>`;
+    grid.appendChild(cell);
+  }
+  totalPoints += 50; // 올인원 보너스
+  $("finalPoints").textContent = totalPoints + " pt";
+  show("done");
+}
+
+// ---------- 이벤트 ----------
+$("startBtn").addEventListener("click", async () => {
+  const errEl = $("introErr");
+  errEl.style.display = "none";
+  try {
+    if (!faceLandmarker) await loadModels();
+    $("loadText").textContent = "카메라를 켜는 중…";
+    await startCamera();
+    loading.classList.remove("active");
+    exIndex = 0; totalPoints = 0;
+    for (const k in perExerciseReps) delete perExerciseReps[k];
+    pointsLive.textContent = "0";
+    show("workout");
+    loadExercise();
+    loop();
+  } catch (e) {
+    loading.classList.remove("active");
+    console.error(e);
+    let msg = "오류가 발생했어요: " + (e.message || e);
+    if (e.name === "NotAllowedError") msg = "카메라 권한이 필요해요. 브라우저 설정에서 허용해 주세요.";
+    if (e.name === "NotFoundError") msg = "카메라를 찾을 수 없어요.";
+    errEl.textContent = msg;
+    errEl.style.display = "block";
+  }
+});
+
+$("backBtn").addEventListener("click", () => { stopCamera(); show("intro"); });
+$("skipBtn").addEventListener("click", () => nextExercise());
+$("againBtn").addEventListener("click", () => show("intro"));
+
+// 디버그용 전역 노출
+window.__facefit = { EXERCISES, detectors, handOpenness, computeYaw };
+
+</script>
+</body>
+</html>
