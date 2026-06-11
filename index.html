@@ -272,7 +272,7 @@
       </div>
       <div class="mp-row">
         <div class="mp-icon">🙆</div>
-        <div class="mp-text"><strong>넥 핏</strong><span>고개 좌우 스트레칭</span></div>
+        <div class="mp-text"><strong>넥 핏</strong><span>고개 좌우·상하 스트레칭</span></div>
       </div>
       <div class="mp-row">
         <div class="mp-icon">✊</div>
@@ -421,8 +421,14 @@ const EXERCISES = [
   {
     id: "neck", module: "NECK", tag: "NECK",
     title: "고개 좌우 돌리기", desc: "고개를 천천히 좌우로",
-    cue: "고개 좌우로", sub: "왼쪽 끝 → 오른쪽 끝 = 1회", goal: 6,
+    cue: "고개 좌우로", sub: "왼쪽 끝 → 오른쪽 끝 = 1회", goal: 5,
     detector: "neckYaw",
+  },
+  {
+    id: "neckPitch", module: "NECK", tag: "NECK",
+    title: "고개 상하 끄덕이기", desc: "고개를 위아래로 천천히",
+    cue: "고개 위아래로", sub: "위로 올렸다 → 아래로 = 1회", goal: 5,
+    detector: "neckPitch",
   },
   {
     id: "fist", module: "HAND", tag: "HAND",
@@ -445,6 +451,7 @@ const perExerciseReps = {}; // id -> count
 let phase = "ready";
 let lastVideoTime = -1;
 let neckSide = null; // 'L' | 'R' | null  넥은 좌우 왕복
+let neckPitchSide = null; // 'U' | 'D' | null  넥 상하
 let oheeSide = null; // 'O' | 'E' | null  오-이 번갈아
 let winkSide = null; // 'L' | 'R' | null  마지막 윙크 쪽
 let winkPhase = "open"; // 'open'(두 눈 뜸) | 'winking'
@@ -560,6 +567,11 @@ function neckDetect(s) {
   return { ok: true, yaw };
 }
 
+function neckPitchDetect(s) {
+  if (!s.faceOk) return { ok: false };
+  return { ok: true, pitch: s.neckPitch };
+}
+
 // 오-이: 입을 오므림(오)과 옆으로 늘림(이)을 번갈아
 function oheeDetect(s) {
   if (!s.faceOk) return { ok: false };
@@ -607,6 +619,7 @@ function loop() {
       signals.face = bsMap(res.faceBlendshapes);
       const lm = res.faceLandmarks[0];
       signals.neckYaw = computeYaw(lm);
+      signals.neckPitch = computePitch(lm);
       drawFaceMini(lm);
     }
   }
@@ -614,6 +627,8 @@ function loop() {
   // ----- 상태/판정 -----
   if (ex.detector === "neckYaw") {
     handleNeck(neckDetect(signals), ex);
+  } else if (ex.detector === "neckPitch") {
+    handleNeckPitch(neckPitchDetect(signals), ex);
   } else if (ex.detector === "ohEe") {
     handleOhEe(oheeDetect(signals), ex);
   } else if (ex.detector === "wink") {
@@ -651,6 +666,22 @@ function handleNeck(d, ex) {
   } else if (yaw > TH) {
     if (neckSide === "L") { neckSide = "R"; addRep(ex); }
     else if (neckSide === null) { neckSide = "R"; }
+  }
+}
+
+// 넥 상하: 위로 올렸다가 → 아래로 내리면 1회
+function handleNeckPitch(d, ex) {
+  const ok = d.ok;
+  setStatus(ok);
+  if (!ok) { updateRing(0); return; }
+  const pitch = d.pitch;
+  updateRing(Math.min(Math.abs(pitch) / 0.5, 1));
+  const TH = 0.40;
+  if (pitch > TH) {                              // 위로 (looking up)
+    if (neckPitchSide === "D" || neckPitchSide === null) { neckPitchSide = "U"; }
+  } else if (pitch < -TH) {                      // 아래로 (looking down)
+    if (neckPitchSide === "U") { neckPitchSide = "D"; addRep(ex); }
+    else if (neckPitchSide === null) { neckPitchSide = "D"; }
   }
 }
 
@@ -735,6 +766,17 @@ function handOpenness(lm) {
   return Math.max(0, Math.min(1, (avg - 1.4) / (2.5 - 1.4)));
 }
 
+// 고개 pitch 추정: 눈 중간~코 vs 코~턱 거리 비율 — 위(+) / 아래(-)
+function computePitch(lm) {
+  const eyeY = (lm[33].y + lm[263].y) / 2; // 양쪽 눈 외각 y 평균
+  const noseY = lm[1].y;
+  const chinY = lm[152].y;
+  const upper = noseY - eyeY;              // 눈→코 거리 (정면 기준 ~65%)
+  const lower = (chinY - noseY) || 1e-3;  // 코→턱 거리
+  const ratio = upper / lower;            // 정면 ~0.65; 위로 >1.0; 아래로 <0.4
+  return Math.max(-1, Math.min(1, (ratio - 0.65) / 0.45));
+}
+
 // 고개 yaw 추정: 코끝(1)이 양 볼(234 왼, 454 오) 사이 어디인가
 // 반환: -1(사용자 왼쪽) .. +1(사용자 오른쪽). 미러링은 화면용일 뿐 좌표는 원본 기준.
 function computeYaw(lm) {
@@ -787,7 +829,7 @@ function renderStepTabs() {
 }
 function loadExercise() {
   const ex = EXERCISES[exIndex];
-  phase = "ready"; neckSide = null; oheeSide = null; winkSide = null; winkPhase = "open";
+  phase = "ready"; neckSide = null; neckPitchSide = null; oheeSide = null; winkSide = null; winkPhase = "open";
   exTitle.textContent = ex.title;
   exDesc.textContent = ex.desc;
   exTag.textContent = ex.tag;
