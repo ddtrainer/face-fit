@@ -128,7 +128,7 @@
   /* ---------- Camera stage ---------- */
   .stage{
     position:relative;margin:0 18px;border-radius:24px;overflow:hidden;
-    background:#0c0b1a;flex:1 1 auto;min-height:0;
+    background:#0c0b1a;aspect-ratio:3/4;flex-shrink:0;
     border:1px solid var(--line);
   }
   .stage video,.stage canvas{
@@ -186,7 +186,7 @@
   .stage-hint.hidden{display:none;}
 
   /* ---------- Bottom action ---------- */
-  .wk-bottom{padding:16px 18px calc(16px + env(safe-area-inset-bottom));flex-shrink:0;}
+  .wk-bottom{padding:16px 18px calc(16px + env(safe-area-inset-bottom));margin-top:auto;}
   .wk-meta{
     display:flex;justify-content:space-between;align-items:center;
     margin-bottom:14px;
@@ -395,22 +395,28 @@ const RING_CIRC = 2 * Math.PI * 42; // 263.9
 // type: 어떤 신호를 보는지. goal: 목표 반복수.
 const EXERCISES = [
   {
-    id: "mouth", module: "FACE", tag: "FACE",
-    title: "입 크게 벌리기", desc: "아~ 입을 크게 벌렸다 닫기",
-    cue: "입을 크게 '아'", sub: "크게 벌렸다가 다물어요", goal: 8,
-    detector: "jawOpen",
-  },
-  {
-    id: "smile", module: "FACE", tag: "FACE",
-    title: "활짝 미소", desc: "입꼬리를 올려 미소 짓기",
-    cue: "활짝 웃기 😄", sub: "입꼬리를 끝까지 올려요", goal: 6,
-    detector: "smile",
+    id: "ohee", module: "FACE", tag: "FACE",
+    title: "입 모양 '오–이'", desc: "입을 '오'와 '이'로 번갈아 크게",
+    cue: "'오' → '이'", sub: "입을 오므렸다가 옆으로 활짝 = 1회", goal: 10,
+    detector: "ohEe",
   },
   {
     id: "brow", module: "FACE", tag: "FACE",
     title: "눈썹 올리기", desc: "눈썹을 위로 치켜올리기",
-    cue: "눈썹 위로 ⬆️", sub: "이마에 주름이 잡히도록", goal: 6,
+    cue: "눈썹 위로 ⬆️", sub: "이마에 주름이 잡히도록", goal: 5,
     detector: "brow",
+  },
+  {
+    id: "wink", module: "FACE", tag: "FACE",
+    title: "좌우 윙크", desc: "왼쪽·오른쪽 번갈아 눈 깜빡이기",
+    cue: "한쪽 눈 윙크 😉", sub: "왼쪽 → 오른쪽 번갈아 깜빡여요", goal: 10,
+    detector: "wink",
+  },
+  {
+    id: "smile", module: "FACE", tag: "FACE",
+    title: "환한 미소", desc: "입꼬리를 올려 활짝 웃기",
+    cue: "활짝 웃기 😄", sub: "입꼬리를 끝까지 올려요", goal: 5,
+    detector: "smile",
   },
   {
     id: "neck", module: "NECK", tag: "NECK",
@@ -439,6 +445,9 @@ const perExerciseReps = {}; // id -> count
 let phase = "ready";
 let lastVideoTime = -1;
 let neckSide = null; // 'L' | 'R' | null  넥은 좌우 왕복
+let oheeSide = null; // 'O' | 'E' | null  오-이 번갈아
+let winkSide = null; // 'L' | 'R' | null  마지막 윙크 쪽
+let winkPhase = "open"; // 'open'(두 눈 뜸) | 'winking'
 
 // ---------- 화면 전환 ----------
 function show(name) {
@@ -551,6 +560,22 @@ function neckDetect(s) {
   return { ok: true, yaw };
 }
 
+// 오-이: 입을 오므림(오)과 옆으로 늘림(이)을 번갈아
+function oheeDetect(s) {
+  if (!s.faceOk) return { ok: false };
+  const oh = Math.max(s.face?.mouthPucker ?? 0, s.face?.mouthFunnel ?? 0); // 오 (오므림)
+  const ee = ((s.face?.mouthSmileLeft ?? 0) + (s.face?.mouthSmileRight ?? 0)) / 2; // 이 (옆으로)
+  return { ok: true, oh, ee };
+}
+
+// 윙크: 한쪽 눈만 감기 (양눈 동시 깜빡임은 제외)
+function winkDetect(s) {
+  if (!s.faceOk) return { ok: false };
+  const bl = s.face?.eyeBlinkLeft ?? 0;
+  const br = s.face?.eyeBlinkRight ?? 0;
+  return { ok: true, bl, br };
+}
+
 // ============================================================
 //  메인 루프
 // ============================================================
@@ -589,6 +614,10 @@ function loop() {
   // ----- 상태/판정 -----
   if (ex.detector === "neckYaw") {
     handleNeck(neckDetect(signals), ex);
+  } else if (ex.detector === "ohEe") {
+    handleOhEe(oheeDetect(signals), ex);
+  } else if (ex.detector === "wink") {
+    handleWink(winkDetect(signals), ex);
   } else {
     handleRep(detectors[ex.detector](signals), ex);
   }
@@ -624,6 +653,44 @@ function handleNeck(d, ex) {
     else if (neckSide === null) { neckSide = "R"; }
   }
 }
+
+// 오-이: '오'(오므림) 도달 후 '이'(옆으로) 도달 = 1회 (번갈아)
+function handleOhEe(d, ex) {
+  const ok = d.ok;
+  setStatus(ok);
+  if (!ok) { updateRing(0); return; }
+  updateRing(Math.max(Math.min(d.oh / 0.45, 1), Math.min(d.ee / 0.45, 1)));
+  const OH_TH = 0.45, EE_TH = 0.45;
+  if (d.oh > OH_TH && d.ee < 0.2) {
+    // '오' 상태 진입
+    if (oheeSide === "E" || oheeSide === null) oheeSide = "O";
+  } else if (d.ee > EE_TH && d.oh < 0.2) {
+    // '이' 상태 진입
+    if (oheeSide === "O") { oheeSide = "E"; addRep(ex); }
+    else if (oheeSide === null) oheeSide = "E";
+  }
+}
+
+// 윙크: 한쪽 눈만 감았다 뜨기, 좌우 번갈아 = 각 1회
+function handleWink(d, ex) {
+  const ok = d.ok;
+  setStatus(ok);
+  if (!ok) { updateRing(0); return; }
+  const bl = d.bl, br = d.br;
+  updateRing(Math.min(Math.max(bl, br) / 0.5, 1));
+  const HI = 0.5, LO = 0.4;
+  const bothOpen = bl < 0.3 && br < 0.3;
+  const leftWink = bl > HI && br < LO;   // 왼눈만 감음
+  const rightWink = br > HI && bl < LO;  // 오른눈만 감음
+
+  if (winkPhase === "open") {
+    if (leftWink && winkSide !== "L") { winkSide = "L"; winkPhase = "winking"; addRep(ex); cueSub.textContent = "다음: 오른쪽 눈 윙크"; }
+    else if (rightWink && winkSide !== "R") { winkSide = "R"; winkPhase = "winking"; addRep(ex); cueSub.textContent = "다음: 왼쪽 눈 윙크"; }
+  } else if (winkPhase === "winking") {
+    if (bothOpen) winkPhase = "open"; // 다시 양눈 뜨면 다음 윙크 받을 준비
+  }
+}
+
 
 function addRep(ex) {
   perExerciseReps[ex.id] = (perExerciseReps[ex.id] || 0) + 1;
@@ -720,7 +787,7 @@ function renderStepTabs() {
 }
 function loadExercise() {
   const ex = EXERCISES[exIndex];
-  phase = "ready"; neckSide = null;
+  phase = "ready"; neckSide = null; oheeSide = null; winkSide = null; winkPhase = "open";
   exTitle.textContent = ex.title;
   exDesc.textContent = ex.desc;
   exTag.textContent = ex.tag;
