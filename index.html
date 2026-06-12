@@ -688,8 +688,8 @@ function loop() {
       for (let i = 0; i < res.landmarks.length; i++) {
         const lm = res.landmarks[i];
         const cat = hd?.[i]?.[0]?.categoryName || "Right";
-        // MediaPipe는 입력이 미러링됐다고 가정하지만 우리는 원본 프레임을 넣으므로 좌우를 뒤집어 사용자 기준으로 맞춤
-        const side = cat === "Left" ? "R" : "L";
+        // 화면이 미러링(셀피)되어 사용자가 보는 좌우와 MediaPipe 라벨을 일치시킴
+        const side = cat === "Left" ? "L" : "R";
         signals.hands.push({ openness: handOpenness(lm), side });
         drawHand(lm);
       }
