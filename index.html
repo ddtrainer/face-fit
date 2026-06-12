@@ -475,6 +475,12 @@ const KO_COUNT = ["", "하나", "둘", "셋", "넷", "다섯", "여섯", "일곱
 // ---------- 상태 ----------
 let faceLandmarker = null;
 let handLandmarker = null;
+let visionFileset = null;     // FilesetResolver 재사용 (CPU 폴백 시)
+let modelDelegate = "GPU";    // 현재 추론 델리게이트
+let rebuilding = false;       // CPU 재구성 중 플래그
+let detectErrFrames = 0;      // 연속 추론 실패 프레임 수
+let anyDetectOk = false;      // 세션 중 한 번이라도 얼굴/손 인식됐는지
+let loopStartT = 0;           // 루프 첫 프레임 시각 (워치독용)
 let stream = null;
 let rafId = null;
 let exIndex = 0;
@@ -557,32 +563,71 @@ function showToast(msg) {
 }
 
 // ---------- 모델 로딩 ----------
-async function loadModels() {
-  loading.classList.add("active");
-  $("loadText").textContent = "AI 모델을 불러오는 중…";
-  const fileset = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm"
-  );
-  faceLandmarker = await FaceLandmarker.createFromOptions(fileset, {
-    baseOptions: {
-      modelAssetPath:
-        "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-      delegate: "GPU",
-    },
+const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+const HAND_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+
+// WebGL2 지원 여부 — 없으면 처음부터 CPU로 (GPU 델리게이트 불가 기기 대응)
+function hasWebGL2() {
+  try {
+    const c = document.createElement("canvas");
+    return !!(c.getContext("webgl2"));
+  } catch (e) { return false; }
+}
+
+// 주어진 델리게이트로 두 랜드마커 생성
+async function buildLandmarkers(delegate) {
+  const face = await FaceLandmarker.createFromOptions(visionFileset, {
+    baseOptions: { modelAssetPath: FACE_MODEL, delegate },
     runningMode: "VIDEO",
     numFaces: 1,
     outputFaceBlendshapes: true,
     outputFacialTransformationMatrixes: false,
   });
-  handLandmarker = await HandLandmarker.createFromOptions(fileset, {
-    baseOptions: {
-      modelAssetPath:
-        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-      delegate: "GPU",
-    },
+  const hand = await HandLandmarker.createFromOptions(visionFileset, {
+    baseOptions: { modelAssetPath: HAND_MODEL, delegate },
     runningMode: "VIDEO",
     numHands: 2,
   });
+  // 이전 인스턴스 정리
+  try { faceLandmarker?.close?.(); } catch (e) {}
+  try { handLandmarker?.close?.(); } catch (e) {}
+  faceLandmarker = face;
+  handLandmarker = hand;
+  modelDelegate = delegate;
+}
+
+async function loadModels() {
+  loading.classList.add("active");
+  $("loadText").textContent = "AI 모델을 불러오는 중…";
+  visionFileset = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm"
+  );
+  const initial = hasWebGL2() ? "GPU" : "CPU";
+  console.log("[FaceFit] WebGL2:", hasWebGL2(), "→ 초기 델리게이트:", initial);
+  try {
+    await buildLandmarkers(initial);
+  } catch (e) {
+    // GPU 생성 실패 → CPU로 재시도
+    console.warn("GPU 모델 생성 실패, CPU로 전환:", e);
+    if (initial === "GPU") await buildLandmarkers("CPU");
+    else throw e;
+  }
+}
+
+// 런타임 추론 실패 시 CPU로 재구성 (GPU 추론이 조용히 깨지는 기기 대응)
+async function rebuildWithCPU() {
+  if (rebuilding || modelDelegate === "CPU") return;
+  rebuilding = true;
+  try {
+    statusText.textContent = "호환 모드 전환 중…";
+    await buildLandmarkers("CPU");
+    detectErrFrames = 0;
+    console.warn("CPU 호환 모드로 전환됨");
+  } catch (e) {
+    console.error("CPU 전환 실패:", e);
+  } finally {
+    rebuilding = false;
+  }
 }
 
 // ---------- 카메라 ----------
@@ -668,6 +713,7 @@ function winkDetect(s) {
 // ============================================================
 function loop() {
   rafId = requestAnimationFrame(loop);
+  if (rebuilding || !faceLandmarker || !handLandmarker) return; // CPU 재구성 중 추론 건너뜀
   if (video.readyState < 2) return;
   const now = performance.now();
   if (video.currentTime === lastVideoTime) return;
@@ -679,31 +725,48 @@ function loop() {
   // ----- 필요한 모델만 추론 -----
   octx.clearRect(0, 0, overlay.width, overlay.height);
 
-  if (ex.module === "HAND") {
-    const res = handLandmarker.detectForVideo(video, now);
-    signals.hands = [];
-    if (res.landmarks && res.landmarks.length) {
-      signals.handOk = true;
-      const hd = res.handedness || res.handednesses; // 버전별 필드명 대응
-      for (let i = 0; i < res.landmarks.length; i++) {
-        const lm = res.landmarks[i];
-        const cat = hd?.[i]?.[0]?.categoryName || "Right";
-        // 화면이 미러링(셀피)되어 사용자가 보는 좌우와 MediaPipe 라벨을 일치시킴
-        const side = cat === "Left" ? "L" : "R";
-        signals.hands.push({ openness: handOpenness(lm), side });
-        drawHand(lm);
+  try {
+    if (ex.module === "HAND") {
+      const res = handLandmarker.detectForVideo(video, now);
+      signals.hands = [];
+      if (res.landmarks && res.landmarks.length) {
+        signals.handOk = true;
+        const hd = res.handedness || res.handednesses; // 버전별 필드명 대응
+        for (let i = 0; i < res.landmarks.length; i++) {
+          const lm = res.landmarks[i];
+          const cat = hd?.[i]?.[0]?.categoryName || "Right";
+          // 화면이 미러링(셀피)되어 사용자가 보는 좌우와 MediaPipe 라벨을 일치시킴
+          const side = cat === "Left" ? "L" : "R";
+          signals.hands.push({ openness: handOpenness(lm), side });
+          drawHand(lm);
+        }
+      }
+    } else {
+      const res = faceLandmarker.detectForVideo(video, now);
+      if (res.faceLandmarks && res.faceLandmarks.length) {
+        signals.faceOk = true;
+        signals.face = bsMap(res.faceBlendshapes);
+        const lm = res.faceLandmarks[0];
+        signals.neckYaw = computeYaw(lm);
+        signals.neckPitch = computePitch(lm);
+        drawFaceMini(lm);
       }
     }
-  } else {
-    const res = faceLandmarker.detectForVideo(video, now);
-    if (res.faceLandmarks && res.faceLandmarks.length) {
-      signals.faceOk = true;
-      signals.face = bsMap(res.faceBlendshapes);
-      const lm = res.faceLandmarks[0];
-      signals.neckYaw = computeYaw(lm);
-      signals.neckPitch = computePitch(lm);
-      drawFaceMini(lm);
-    }
+    detectErrFrames = 0; // 추론 성공
+  } catch (e) {
+    // GPU 추론이 깨지는 기기: 몇 프레임 연속 실패하면 CPU로 자동 전환
+    detectErrFrames++;
+    console.error("추론 오류:", e);
+    if (detectErrFrames >= 3) rebuildWithCPU();
+    return;
+  }
+
+  // 워치독: 인식이 한 번도 안 되고 GPU면, 8초 후 CPU로 전환 시도
+  // (GPU가 예외 없이 빈 결과만 내는 기기 대응)
+  if (loopStartT === 0) loopStartT = now;
+  if (signals.faceOk || signals.handOk) anyDetectOk = true;
+  if (!anyDetectOk && modelDelegate === "GPU" && !rebuilding && now - loopStartT > 8000) {
+    rebuildWithCPU();
   }
 
   // ----- 상태/판정 -----
@@ -1066,6 +1129,7 @@ $("startBtn").addEventListener("click", async () => {
     await startCamera();
     loading.classList.remove("active");
     exIndex = 0; totalPoints = 0;
+    anyDetectOk = false; loopStartT = 0; detectErrFrames = 0; // 인식 워치독 초기화
     for (const k in perExerciseReps) delete perExerciseReps[k];
     pointsLive.textContent = "0";
     show("workout");
