@@ -587,6 +587,7 @@ let winkReady = true; // 두 눈 뜬 상태(다음 윙크 받을 준비)
 const fistCount = { L: 0, R: 0 };       // 손별 잼잼 횟수
 let fistGuideSide = "L";   // 'L' → 'R'  지금 할 손 (순차 안내)
 let fistGuidePhase = "ready"; // 단일 상태머신: 'ready'(폄) ↔ 'active'(쥠)
+let leftHandLabel = null;  // 왼손 단계에서 쓴 손의 MediaPipe 라벨 (오른손 단계는 '다른' 손만 인정)
 
 // ---------- 사운드 (Web Audio) ----------
 let audioCtx = null;
@@ -825,9 +826,8 @@ function loop() {
         for (let i = 0; i < res.landmarks.length; i++) {
           const lm = res.landmarks[i];
           const cat = hd?.[i]?.[0]?.categoryName || "Right";
-          // 화면이 미러링(셀피)되어 사용자가 보는 좌우와 MediaPipe 라벨을 일치시킴
-          const side = cat === "Left" ? "L" : "R";
-          signals.hands.push({ openness: handOpenness(lm), side });
+          // label: MediaPipe 원시 좌우 라벨 ("Left"/"Right"). 두 손 구분에 사용.
+          signals.hands.push({ openness: handOpenness(lm), label: cat });
           drawHand(lm);
         }
       }
@@ -882,18 +882,42 @@ function updateFistCue(ex) {
   cueBig.textContent = `${hn} 쥐었다 펴기 ✊`;
   cueSub.textContent = `${hn} ${fistCount[fistGuideSide]}/${ex.goal}`;
 }
+// 여러 손 중 가장 많이 쥔(openness 최소) 손 = 지금 동작 중인 손
+function pickActiveHand(hands) {
+  let best = hands[0];
+  for (const h of hands) if (h.openness < best.openness) best = h;
+  return best;
+}
 function handleFist(s, ex) {
   setStatus(s.handOk);
   if (!s.handOk || !s.hands.length) { updateRing(0); return; }
-  // 한 손만 사용한다고 가정 → 가장 많이 쥔 손(openness 최소)을 신호로
-  let openness = 1;
-  for (const h of s.hands) openness = Math.min(openness, h.openness);
+
+  let hand;
+  if (fistGuideSide === "L") {
+    // 왼손 단계: 화면의 손을 사용 (한 손만 보여준다고 가정)
+    hand = pickActiveHand(s.hands);
+  } else {
+    // 오른손 단계: 왼손 단계와 '다른' 손(라벨이 다른 손)만 인정
+    const others = s.hands.filter((h) => h.label !== leftHandLabel);
+    if (!others.length) {
+      // 왼손과 같은 손을 계속 쓰는 중 → 카운트 막고 안내
+      updateRing(0);
+      fistGuidePhase = "ready";
+      cueBig.textContent = "오른손을 보여주세요 🖐️";
+      cueSub.textContent = `오른손 ${fistCount.R}/${ex.goal}`;
+      return;
+    }
+    hand = pickActiveHand(others);
+  }
+
+  const openness = hand.openness;
   updateRing(1 - openness); // 주먹에 가까울수록 링이 참
 
   if (fistGuidePhase === "ready" && openness < 0.3) {
     fistGuidePhase = "active";          // 주먹 쥠
   } else if (fistGuidePhase === "active" && openness > 0.6) {
     fistGuidePhase = "ready";           // 다시 폄 = 1회
+    if (fistGuideSide === "L") leftHandLabel = hand.label; // 왼손이 쓴 손 라벨 기록
     addFistRep(ex);
   }
   updateFistCue(ex);
@@ -1143,7 +1167,7 @@ function loadExercise() {
   const ex = EXERCISES[exIndex];
   phase = "ready"; neckSide = null; neckPitchSide = null; oheeSide = null;
   winkTarget = "L"; winkReady = true;
-  fistCount.L = 0; fistCount.R = 0; fistGuideSide = "L"; fistGuidePhase = "ready";
+  fistCount.L = 0; fistCount.R = 0; fistGuideSide = "L"; fistGuidePhase = "ready"; leftHandLabel = null;
   repGraceUntil = performance.now() + 1500; // 시작 직후 1.5초간 카운트 금지 (오탐 방지)
   exTitle.textContent = ex.title;
   exDesc.textContent = ex.desc;
