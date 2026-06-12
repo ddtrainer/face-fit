@@ -13,9 +13,9 @@
     --bg-2:#1f1c3d;
     --card:#26224a;
     --card-2:#2e2a55;
-    --ink:#f4f1ea;
-    --ink-dim:#a9a3c7;
-    --ink-faint:#6f6a93;
+    --ink:#f8f6f0;
+    --ink-dim:#cdc8e2;
+    --ink-faint:#9b96bd;
     --jade:#2dd4bf;
     --jade-deep:#0f766e;
     --coral:#fb7185;
@@ -89,7 +89,7 @@
   /* ---------- Buttons ---------- */
   .btn{
     border:none;border-radius:16px;font-family:inherit;cursor:pointer;
-    font-weight:700;font-size:16.5px;padding:17px;width:100%;
+    font-weight:700;font-size:19px;padding:19px;width:100%;
     transition:transform .12s ease, opacity .2s ease;
   }
   .btn:active{transform:scale(0.975);}
@@ -149,8 +149,8 @@
     position:absolute;inset:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center;
   }
-  .ring-count .num{font-size:30px;font-weight:800;line-height:1;}
-  .ring-count .goal{font-size:12px;color:var(--ink-dim);margin-top:2px;}
+  .ring-count .num{font-size:38px;font-weight:800;line-height:1;}
+  .ring-count .goal{font-size:15px;color:var(--ink-dim);margin-top:3px;font-weight:600;}
 
   .stage.pulse{animation:pulse .4s ease;}
   @keyframes pulse{
@@ -164,13 +164,13 @@
     background:linear-gradient(0deg,rgba(12,11,26,0.92),transparent);
     text-align:center;
   }
-  .cue .big{font-size:26px;font-weight:800;letter-spacing:-0.01em;}
-  .cue .sub{font-size:13.5px;color:var(--ink-dim);margin-top:5px;}
+  .cue .big{font-size:34px;font-weight:800;letter-spacing:-0.01em;}
+  .cue .sub{font-size:18px;color:var(--ink-dim);margin-top:7px;font-weight:600;}
 
   .status-pill{
     position:absolute;z-index:3;top:16px;right:16px;
     display:flex;align-items:center;gap:6px;
-    font-size:12px;font-weight:600;padding:6px 11px;border-radius:999px;
+    font-size:14px;font-weight:600;padding:7px 13px;border-radius:999px;
     background:rgba(12,11,26,0.7);backdrop-filter:blur(8px);color:var(--ink-dim);
   }
   .status-pill .led{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);}
@@ -180,8 +180,8 @@
   /* gentle hint when no face/hand */
   .stage-hint{
     position:absolute;z-index:3;inset:0;display:flex;align-items:center;justify-content:center;
-    text-align:center;padding:30px;color:var(--ink-dim);font-size:14px;line-height:1.5;
-    background:rgba(12,11,26,0.55);backdrop-filter:blur(2px);
+    text-align:center;padding:30px;color:var(--ink);font-size:18px;font-weight:600;line-height:1.5;
+    background:rgba(12,11,26,0.6);backdrop-filter:blur(2px);
   }
   .stage-hint.hidden{display:none;}
 
@@ -191,12 +191,12 @@
     display:flex;justify-content:space-between;align-items:center;
     margin-bottom:14px;
   }
-  .wk-meta .title{font-size:18px;font-weight:800;}
-  .wk-meta .desc{font-size:13px;color:var(--ink-faint);margin-top:2px;}
+  .wk-meta .title{font-size:23px;font-weight:800;}
+  .wk-meta .desc{font-size:16px;color:var(--ink-dim);margin-top:3px;}
   .wk-meta .module-tag{
-    font-size:11px;font-weight:700;letter-spacing:0.05em;
-    color:var(--jade);background:rgba(45,212,191,0.12);
-    padding:5px 10px;border-radius:8px;
+    font-size:15px;font-weight:700;letter-spacing:0.02em;
+    color:var(--jade);background:rgba(45,212,191,0.16);
+    padding:7px 13px;border-radius:10px;
   }
 
   /* ---------- Loading ---------- */
@@ -420,44 +420,57 @@ const EXERCISES = [
     title: "입 모양 '오–이'", desc: "입을 '오'와 '이'로 번갈아 크게",
     cue: "'오' → '이'", sub: "입을 오므렸다가 옆으로 활짝 = 1회", goal: 10,
     detector: "ohEe",
+    voice: "입을 오 하고, 이 하세요. 번갈아 가며 천천히 따라 해 주세요.",
   },
   {
     id: "brow", module: "FACE", tag: "FACE",
     title: "눈썹 올리기", desc: "눈썹을 위로 치켜올리기",
     cue: "눈썹 위로 ⬆️", sub: "이마에 주름이 잡히도록", goal: 5,
     detector: "brow",
+    voice: "눈썹을 위로 올렸다 내리세요. 이마에 주름이 잡히도록 크게요.",
   },
   {
     id: "wink", module: "FACE", tag: "FACE",
     title: "좌우 윙크", desc: "왼쪽·오른쪽 번갈아 눈 깜빡이기",
     cue: "한쪽 눈 윙크 😉", sub: "왼쪽 → 오른쪽 번갈아 깜빡여요", goal: 10,
     detector: "wink",
+    voice: "한쪽 눈씩 깜빡여 보세요. 왼쪽 오른쪽 번갈아 가며 해 주세요.",
   },
   {
     id: "smile", module: "FACE", tag: "FACE",
     title: "환한 미소", desc: "입꼬리를 올려 활짝 웃기",
     cue: "활짝 웃기 😄", sub: "입꼬리를 끝까지 올려요", goal: 5,
     detector: "smile",
+    voice: "입꼬리를 올려 활짝 웃어 보세요. 환하게 다섯 번이에요.",
   },
   {
     id: "neck", module: "NECK", tag: "NECK",
     title: "고개 좌우 돌리기", desc: "고개를 천천히 좌우로",
     cue: "고개 좌우로", sub: "왼쪽 끝 → 오른쪽 끝 = 1회", goal: 5,
     detector: "neckYaw",
+    voice: "고개를 천천히 왼쪽 오른쪽으로 돌리세요. 무리하지 말고 천천히요.",
   },
   {
     id: "neckPitch", module: "NECK", tag: "NECK",
     title: "고개 상하 끄덕이기", desc: "고개를 위아래로 천천히",
     cue: "고개 위아래로", sub: "위로 올렸다 → 아래로 = 1회", goal: 5,
     detector: "neckPitch",
+    voice: "고개를 천천히 위로 올렸다 아래로 내리세요. 끄덕끄덕 천천히요.",
   },
   {
     id: "fist", module: "HAND", tag: "HAND",
     title: "잼잼 (주먹 쥐기)", desc: "양손 번갈아 주먹 쥐고 펴기",
     cue: "주먹 쥐었다 펴기 ✊", sub: "왼손·오른손 각 10회", goal: 10,
     detector: "fist",
+    voice: "양손으로 주먹을 쥐었다 활짝 펴세요. 잼잼 하듯이 천천히요.",
   },
 ];
+
+// 모듈 한국어 라벨 (영어 태그 화면 노출 방지)
+const MODULE_KO = { FACE: "얼굴", NECK: "목", HAND: "손" };
+// 카운트 음성 (토박이말)
+const KO_COUNT = ["", "하나", "둘", "셋", "넷", "다섯", "여섯", "일곱", "여덟", "아홉", "열",
+  "열하나", "열둘", "열셋", "열넷", "열다섯", "열여섯", "열일곱", "열여덟", "열아홉", "스물"];
 
 // ---------- 상태 ----------
 let faceLandmarker = null;
@@ -505,6 +518,32 @@ function chime() {
 }
 // 카운트음: 횟수가 올라갈수록 음정이 살짝 높아져 구분됨
 function countBeep(n) { beep(520 + Math.min(n, 12) * 26, 0.08, "triangle", 0.2); }
+
+// ---------- 음성 안내 (Web Speech / TTS) ----------
+let ttsOn = true;
+let koVoice = null;
+function initTTS() {
+  if (!("speechSynthesis" in window)) { ttsOn = false; return; }
+  const pick = () => {
+    const vs = speechSynthesis.getVoices();
+    koVoice = vs.find((v) => v.lang === "ko-KR") || vs.find((v) => (v.lang || "").startsWith("ko")) || null;
+  };
+  pick();
+  speechSynthesis.onvoiceschanged = pick;
+}
+function speak(text, interrupt = true) {
+  if (!ttsOn || !text || !("speechSynthesis" in window)) return;
+  try {
+    if (interrupt) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "ko-KR";
+    if (koVoice) u.voice = koVoice;
+    u.rate = 0.92; u.pitch = 1.0; u.volume = 1.0;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+function speakCount(n) { speak(KO_COUNT[n] || String(n), true); }
+function stopSpeak() { try { if ("speechSynthesis" in window) speechSynthesis.cancel(); } catch (e) {} }
 
 // ---------- 화면 전환 ----------
 function show(name) {
@@ -563,6 +602,7 @@ function stopCamera() {
   if (stream) stream.getTracks().forEach((t) => t.stop());
   if (rafId) cancelAnimationFrame(rafId);
   stream = null; rafId = null;
+  stopSpeak();
 }
 
 // ---------- blendshape helper ----------
@@ -582,16 +622,16 @@ const detectors = {
   // 미소: mouthSmileLeft+Right 평균
   smile(s) {
     const v = ((s.face?.mouthSmileLeft ?? 0) + (s.face?.mouthSmileRight ?? 0)) / 2;
-    const open = v > 0.5, close = v < 0.18;
-    return { phaseOpen: open, phaseClose: close, progress: Math.min(v / 0.5, 1), ok: s.faceOk };
+    const open = v > 0.32, close = v < 0.14; // 시니어 완화
+    return { phaseOpen: open, phaseClose: close, progress: Math.min(v / 0.32, 1), ok: s.faceOk };
   },
   // 눈썹 올리기: browInnerUp + outer 평균
   brow(s) {
     const v = ((s.face?.browInnerUp ?? 0) +
                (s.face?.browOuterUpLeft ?? 0) +
                (s.face?.browOuterUpRight ?? 0)) / 3;
-    const open = v > 0.45, close = v < 0.15;
-    return { phaseOpen: open, phaseClose: close, progress: Math.min(v / 0.45, 1), ok: s.faceOk };
+    const open = v > 0.30, close = v < 0.12; // 시니어 완화
+    return { phaseOpen: open, phaseClose: close, progress: Math.min(v / 0.30, 1), ok: s.faceOk };
   },
 };
 
@@ -691,9 +731,9 @@ function handleFist(s, ex) {
   for (const h of s.hands) {
     progress = Math.max(progress, 1 - h.openness); // 주먹에 가까울수록 링이 참
     const side = h.side;
-    if (fistPhase[side] === "ready" && h.openness < 0.25) {
-      fistPhase[side] = "active";                 // 주먹 쥠
-    } else if (fistPhase[side] === "active" && h.openness > 0.7) {
+    if (fistPhase[side] === "ready" && h.openness < 0.3) {
+      fistPhase[side] = "active";                 // 주먹 쥠 (0~1손가락, 시니어 완화)
+    } else if (fistPhase[side] === "active" && h.openness > 0.6) {
       fistPhase[side] = "ready";                  // 다시 폄 = 1회 완료
       if (fistCount[side] < ex.goal) addFistRep(ex, side);
     }
@@ -709,7 +749,9 @@ function addFistRep(ex, side) {
   totalPoints += 1;
   pointsLive.textContent = totalPoints;
   repNum.textContent = total;
-  countBeep(side === "L" ? fistCount.L : fistCount.R);
+  const n = side === "L" ? fistCount.L : fistCount.R;
+  countBeep(n);
+  speak(`${side === "L" ? "왼손" : "오른손"} ${KO_COUNT[n] || n}`, true);
   stage.classList.remove("pulse"); void stage.offsetWidth; stage.classList.add("pulse");
 
   if (fistCount.L >= ex.goal && fistCount.R >= ex.goal) {
@@ -717,6 +759,7 @@ function addFistRep(ex, side) {
     pointsLive.textContent = totalPoints;
     showToast(`${ex.title} 완료! +20pt`);
     chime();
+    speak("잘하셨어요!", false);
     setTimeout(() => nextExercise(), 900);
   }
 }
@@ -742,8 +785,8 @@ function handleNeck(d, ex) {
   setStatus(ok);
   if (!ok) { updateRing(0); return; }
   const yaw = d.yaw;
-  updateRing(Math.min(Math.abs(yaw) / 0.6, 1));
-  const TH = 0.45;
+  updateRing(Math.min(Math.abs(yaw) / 0.45, 1));
+  const TH = 0.32; // 시니어 완화
   if (yaw < -TH) {
     if (neckSide === "R" || neckSide === null) { neckSide = "L"; }
   } else if (yaw > TH) {
@@ -758,8 +801,8 @@ function handleNeckPitch(d, ex) {
   setStatus(ok);
   if (!ok) { updateRing(0); return; }
   const pitch = d.pitch;
-  updateRing(Math.min(Math.abs(pitch) / 0.5, 1));
-  const TH = 0.40;
+  updateRing(Math.min(Math.abs(pitch) / 0.4, 1));
+  const TH = 0.28; // 시니어 완화
   if (pitch > TH) {                              // 위로 (looking up)
     if (neckPitchSide === "D" || neckPitchSide === null) { neckPitchSide = "U"; }
   } else if (pitch < -TH) {                      // 아래로 (looking down)
@@ -773,8 +816,8 @@ function handleOhEe(d, ex) {
   const ok = d.ok;
   setStatus(ok);
   if (!ok) { updateRing(0); return; }
-  updateRing(Math.max(Math.min(d.oh / 0.45, 1), Math.min(d.ee / 0.45, 1)));
-  const OH_TH = 0.45, EE_TH = 0.45;
+  updateRing(Math.max(Math.min(d.oh / 0.32, 1), Math.min(d.ee / 0.32, 1)));
+  const OH_TH = 0.32, EE_TH = 0.32; // 시니어 완화
   if (d.oh > OH_TH && d.ee < 0.2) {
     // '오' 상태 진입
     if (oheeSide === "E" || oheeSide === null) oheeSide = "O";
@@ -791,8 +834,8 @@ function handleWink(d, ex) {
   setStatus(ok);
   if (!ok) { updateRing(0); return; }
   const bl = d.bl, br = d.br;
-  updateRing(Math.min(Math.max(bl, br) / 0.5, 1));
-  const HI = 0.5, LO = 0.4;
+  updateRing(Math.min(Math.max(bl, br) / 0.45, 1));
+  const HI = 0.45, LO = 0.35; // 시니어 완화
   const bothOpen = bl < 0.3 && br < 0.3;
   const leftWink = bl > HI && br < LO;   // 왼눈만 감음
   const rightWink = br > HI && bl < LO;  // 오른눈만 감음
@@ -813,6 +856,7 @@ function addRep(ex) {
   pointsLive.textContent = totalPoints;
   repNum.textContent = c;
   countBeep(c);
+  speakCount(c);
   stage.classList.remove("pulse"); void stage.offsetWidth; stage.classList.add("pulse");
 
   if (c >= ex.goal) {
@@ -820,6 +864,7 @@ function addRep(ex) {
     pointsLive.textContent = totalPoints;
     showToast(`${ex.title} 완료! +20pt`);
     chime();
+    speak("잘하셨어요!", false);
     setTimeout(() => nextExercise(), 900);
   }
 }
@@ -916,7 +961,7 @@ function loadExercise() {
   fistCount.L = 0; fistCount.R = 0; fistPhase.L = "ready"; fistPhase.R = "ready";
   exTitle.textContent = ex.title;
   exDesc.textContent = ex.desc;
-  exTag.textContent = ex.tag;
+  exTag.textContent = MODULE_KO[ex.tag] || ex.tag;
   cueBig.textContent = ex.cue;
   cueSub.textContent = ex.sub;
   if (ex.detector === "fist") {
@@ -928,6 +973,7 @@ function loadExercise() {
   }
   updateRing(0);
   renderStepTabs();
+  speak(`${ex.title}. ${ex.voice || ""}`, true); // 동작 시작 음성 안내
 }
 function nextExercise() {
   exIndex++;
@@ -1005,6 +1051,7 @@ function finish() {
   show("done");
   startFireworks();
   chime();
+  speak("오늘도 정말 잘하셨어요. 내일 또 만나요.", false);
 }
 
 // ---------- 이벤트 ----------
@@ -1012,6 +1059,7 @@ $("startBtn").addEventListener("click", async () => {
   const errEl = $("introErr");
   errEl.style.display = "none";
   initAudio(); // 사용자 제스처 시점에 오디오 컨텍스트 활성화
+  initTTS();
   try {
     if (!faceLandmarker) await loadModels();
     $("loadText").textContent = "카메라를 켜는 중…";
