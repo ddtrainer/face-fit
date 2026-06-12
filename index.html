@@ -569,6 +569,7 @@ let rebuilding = false;       // CPU 재구성 중 플래그
 let detectErrFrames = 0;      // 연속 추론 실패 프레임 수
 let anyDetectOk = false;      // 세션 중 한 번이라도 얼굴/손 인식됐는지
 let loopStartT = 0;           // 루프 첫 프레임 시각 (워치독용)
+let repGraceUntil = 0;        // 이 시각 전에는 카운트 금지 (동작 시작 직후 오탐 방지)
 let stream = null;
 let rafId = null;
 let exIndex = 0;
@@ -894,6 +895,7 @@ function handleFist(s, ex) {
 }
 
 function addFistRep(ex, side) {
+  if (performance.now() < repGraceUntil) return; // 동작 시작 직후 오탐 무시
   fistCount[side]++;
   perExerciseReps[ex.id] = (perExerciseReps[ex.id] || 0) + 1;
   const total = fistCount.L + fistCount.R;
@@ -902,7 +904,9 @@ function addFistRep(ex, side) {
   repNum.textContent = total;
   const n = side === "L" ? fistCount.L : fistCount.R;
   countBeep(n);
-  speak(`${side === "L" ? "왼손" : "오른손"} ${KO_COUNT[n] || n}`, true);
+  // 첫 회만 손 이름을 붙이고(왼손 하나/오른손 하나), 이후엔 숫자만(둘, 셋, 넷…)
+  const handName = side === "L" ? "왼손" : "오른손";
+  speak(n === 1 ? `${handName} 하나` : (KO_COUNT[n] || String(n)), true);
   stage.classList.remove("pulse"); void stage.offsetWidth; stage.classList.add("pulse");
 
   if (fistCount.L >= ex.goal && fistCount.R >= ex.goal) {
@@ -1001,6 +1005,7 @@ function handleWink(d, ex) {
 
 
 function addRep(ex) {
+  if (performance.now() < repGraceUntil) return; // 동작 시작 직후 오탐 무시
   perExerciseReps[ex.id] = (perExerciseReps[ex.id] || 0) + 1;
   const c = perExerciseReps[ex.id];
   totalPoints += 1;
@@ -1110,6 +1115,7 @@ function loadExercise() {
   const ex = EXERCISES[exIndex];
   phase = "ready"; neckSide = null; neckPitchSide = null; oheeSide = null; winkSide = null; winkPhase = "open";
   fistCount.L = 0; fistCount.R = 0; fistPhase.L = "ready"; fistPhase.R = "ready";
+  repGraceUntil = performance.now() + 1500; // 시작 직후 1.5초간 카운트 금지 (오탐 방지)
   exTitle.textContent = ex.title;
   exDesc.textContent = ex.desc;
   exTag.textContent = MODULE_KO[ex.tag] || ex.tag;
